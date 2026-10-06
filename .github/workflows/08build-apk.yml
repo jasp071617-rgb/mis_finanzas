@@ -1,0 +1,52 @@
+name: Construir APK
+
+on:
+  push:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Preparar proyecto Android
+        run: |
+          mkdir -p www
+          cp index.html www/index.html
+          npm init -y
+          npm install @capacitor/core@8.5.2 @capacitor/cli@8.5.2 @capacitor/android@8.5.2 @capacitor/share@8.0.3 @capacitor/filesystem@8.1.4
+          echo '{"appId":"com.misfinanzas.app","appName":"Mis finanzas","webDir":"www"}' > capacitor.config.json
+          npx cap add android
+          npx cap sync android
+
+      - name: Compilar APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: mis-finanzas-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Publicar APK para descargar
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: apk-${{ github.run_number }}
+          name: Mis finanzas (versión ${{ github.run_number }})
+          files: android/app/build/outputs/apk/debug/app-debug.apk
